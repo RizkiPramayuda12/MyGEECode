@@ -1,0 +1,36 @@
+// Pemetaan wilayah terdampak banjir Jakarta&Bekasi 1 Januari 2020
+// Script kode diadaptasi dari Mr.Simon Ilyushchenko https://labo.obs-mip.fr/multitemp/mapping-flooded-areas-using-sentinel-1-in-google-earth-engine/
+
+var aoi = ee.FeatureCollection(geometry1);
+// Menampilkan Citra Sentinel-1 dengan VV Polarisation
+var s1 = ee.ImageCollection('COPERNICUS/S1_GRD').filterBounds(aoi)
+                                                .filter(ee.Filter.listContains('transmitterReceiverPolarisation', 'VV'))
+                                                .select('VV');
+
+// Waktu Sebelum dan Sesudah Kejadian
+var Sebelum = s1.filterDate('2020-8-1', '2020-8-10').median().clip(aoi);
+var Sesudah = s1.filterDate('2021-01-12', '2021-01-30').median().clip(aoi);
+
+// Menentukan ambang batas penghalusan area banjir
+var Radius_Penghalusan = 10; 
+var Ambang_atas = -3;
+var Beda_Kehalusan = Sesudah.focal_median(Radius_Penghalusan)
+                            .subtract(Sebelum.focal_median(Radius_Penghalusan));
+var Ambang_Perbedaan = Beda_Kehalusan.lt(Ambang_atas);
+
+// Menampilkan Hasil
+Map.centerObject(Kalsel, 10);
+Map.addLayer(Sebelum, {min:-30,max:0}, 'Sebelum Banjir');
+Map.addLayer(Sesudah, {min:-30,max:0}, 'Sesudah Banjir');
+Map.addLayer(Ambang_Perbedaan.updateMask(Ambang_Perbedaan), Area_Banjir, 'Area Banjir');
+
+var collection = ee.ImageCollection(Sebelum.merge(Sesudah));
+
+// Export (change dimensions or scale for higher quality).
+Export.video.toDrive({
+  collection: collection,
+  description: 'Timelapsbanjirkalsel',
+  dimensions: 500,
+  framesPerSecond: 10,
+  region: aoi
+});
